@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,
+initial-scale=1.0,
+maximum-scale=1.0,
+user-scalable=no,
+viewport-fit=cover">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<title>Catch Rate</title>
+
+<style>
+
+* {
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  font-family:
+  -apple-system,
+  BlinkMacSystemFont,
+  "Segoe UI",
+  sans-serif;
+
+  background: #111;
+  color: white;
+}
+
+
+/* =========================
+   左右のカウントエリア
+========================= */
+
+#screen {
+  position: fixed;
+  inset: 0;
+
+  display: flex;
+
+  width: 100%;
+  height: 100%;
+}
+
+.area {
+  width: 50%;
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+  align-items: center;
+
+  cursor: pointer;
+
+  touch-action: manipulation;
+}
+
+
+/* MISS */
+
+#miss {
+  background: #b52b2b;
+}
+
+
+/* CATCH */
+
+#catch {
+  background: #16883a;
+}
+
+
+/* 文字 */
+
+.title {
+  font-size: clamp(25px, 6vw, 55px);
+  font-weight: 800;
+}
+
+.count {
+  font-size: clamp(80px, 24vw, 210px);
+  font-weight: 900;
+
+  line-height: 1;
+
+  font-variant-numeric: tabular-nums;
+}
+
+.rate {
+  margin-top: 10px;
+
+  font-size: clamp(20px, 5vw, 40px);
+  font-weight: 700;
+}
+
+
+/* =========================
+   上中央 キャッチ率
+========================= */
+
+#centerInfo {
+
+  position: fixed;
+
+  top: max(12px, env(safe-area-inset-top));
+
+  left: 50%;
+  transform: translateX(-50%);
+
+  z-index: 100;
+
+  min-width: 130px;
+
+  padding: 8px 16px;
+
+  border-radius: 15px;
+
+  background: rgba(0,0,0,0.72);
+
+  text-align: center;
+
+  pointer-events: none;
+}
+
+#catchRate {
+
+  font-size: 30px;
+
+  line-height: 1.1;
+
+  font-weight: 900;
+
+  font-variant-numeric: tabular-nums;
+}
+
+#rateLabel {
+
+  margin-top: 2px;
+
+  font-size: 12px;
+}
+
+#total {
+
+  margin-top: 3px;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+
+/* =========================
+   下ボタン
+========================= */
+
+#controls {
+
+  position: fixed;
+
+  left: 50%;
+
+  bottom:
+  max(12px, env(safe-area-inset-bottom));
+
+  transform: translateX(-50%);
+
+  z-index: 1000;
+
+  display: flex;
+
+  gap: 10px;
+}
+
+.control {
+
+  min-width: 100px;
+  min-height: 48px;
+
+  padding: 10px 15px;
+
+  border: 1px solid rgba(255,255,255,.4);
+
+  border-radius: 13px;
+
+  background: rgba(0,0,0,.82);
+
+  color: white;
+
+  font-size: 16px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  touch-action: manipulation;
+}
+
+
+/* タップ時 */
+
+.area.flash {
+  filter: brightness(1.5);
+}
+
+.control:active {
+  transform: scale(.95);
+}
+
+</style>
+</head>
+
+
+<body>
+
+
+<!-- 左右タップエリア -->
+
+<div id="screen">
+
+  <!-- MISS -->
+
+  <div id="miss" class="area">
+
+    <div class="title">
+      MISS
+    </div>
+
+    <div
+    id="missCount"
+    class="count">
+      0
+    </div>
+
+    <div
+    id="missPercent"
+    class="rate">
+      0.0%
+    </div>
+
+  </div>
+
+
+  <!-- CATCH -->
+
+  <div id="catch" class="area">
+
+    <div class="title">
+      CATCH
+    </div>
+
+    <div
+    id="catchCount"
+    class="count">
+      0
+    </div>
+
+    <div
+    id="catchPercent"
+    class="rate">
+      0.0%
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- 中央表示 -->
+
+<div id="centerInfo">
+
+  <div id="catchRate">
+    0.0%
+  </div>
+
+  <div id="rateLabel">
+    キャッチ率
+  </div>
+
+  <div id="total">
+    TOTAL 0
+  </div>
+
+</div>
+
+
+<!-- 操作ボタン -->
+
+<div id="controls">
+
+  <button
+  id="undo"
+  class="control"
+  type="button">
+    ↩ 戻す
+  </button>
+
+  <button
+  id="reset"
+  class="control"
+  type="button">
+    リセット
+  </button>
+
+</div>
+
+
+
+<script>
+
+/* =========================
+   データ
+========================= */
+
+let catchCount = 0;
+
+let missCount = 0;
+
+let history = [];
+
+
+/* =========================
+   要素取得
+========================= */
+
+const catchArea =
+document.getElementById("catch");
+
+const missArea =
+document.getElementById("miss");
+
+const catchCountDisplay =
+document.getElementById("catchCount");
+
+const missCountDisplay =
+document.getElementById("missCount");
+
+const catchPercentDisplay =
+document.getElementById("catchPercent");
+
+const missPercentDisplay =
+document.getElementById("missPercent");
+
+const catchRateDisplay =
+document.getElementById("catchRate");
+
+const totalDisplay =
+document.getElementById("total");
+
+const undoButton =
+document.getElementById("undo");
+
+const resetButton =
+document.getElementById("reset");
+
+
+/* =========================
+   画面更新
+========================= */
+
+function update() {
+
+  const total =
+  catchCount + missCount;
+
+
+  let catchRate = 0;
+
+  let missRate = 0;
+
+
+  if (total > 0) {
+
+    catchRate =
+    (catchCount / total) * 100;
+
+    missRate =
+    (missCount / total) * 100;
+
+  }
+
+
+  catchCountDisplay.textContent =
+  catchCount;
+
+
+  missCountDisplay.textContent =
+  missCount;
+
+
+  catchPercentDisplay.textContent =
+  catchRate.toFixed(1) + "%";
+
+
+  missPercentDisplay.textContent =
+  missRate.toFixed(1) + "%";
+
+
+  catchRateDisplay.textContent =
+  catchRate.toFixed(1) + "%";
+
+
+  totalDisplay.textContent =
+  "TOTAL " + total;
+
+}
+
+
+/* =========================
+   タップ時の光る演出
+========================= */
+
+function flash(element) {
+
+  element.classList.add("flash");
+
+  setTimeout(function() {
+
+    element.classList.remove("flash");
+
+  }, 100);
+
+}
+
+
+/* =========================
+   MISS
+========================= */
+
+missArea.addEventListener(
+"pointerup",
+function(event) {
+
+  /*
+  ボタン上で発生したイベントは
+  カウントしない
+  */
+
+  if (
+    event.target.closest("#controls")
+  ) {
+    return;
+  }
+
+
+  missCount++;
+
+  history.push("miss");
+
+  flash(missArea);
+
+  update();
+
+});
+
+
+/* =========================
+   CATCH
+========================= */
+
+catchArea.addEventListener(
+"pointerup",
+function(event) {
+
+  if (
+    event.target.closest("#controls")
+  ) {
+    return;
+  }
+
+
+  catchCount++;
+
+  history.push("catch");
+
+  flash(catchArea);
+
+  update();
+
+});
+
+
+/* =========================
+   1回戻す
+========================= */
+
+undoButton.addEventListener(
+"click",
+function(event) {
+
+  event.preventDefault();
+
+  event.stopPropagation();
+
+
+  if (history.length === 0) {
+    return;
+  }
+
+
+  const last =
+  history.pop();
+
+
+  if (
+    last === "catch" &&
+    catchCount > 0
+  ) {
+
+    catchCount--;
+
+  }
+
+
+  if (
+    last === "miss" &&
+    missCount > 0
+  ) {
+
+    missCount--;
+
+  }
+
+
+  update();
+
+});
+
+
+/* =========================
+   リセット
+========================= */
+
+resetButton.addEventListener(
+"click",
+function(event) {
+
+  event.preventDefault();
+
+  event.stopPropagation();
+
+
+  catchCount = 0;
+
+  missCount = 0;
+
+  history = [];
+
+
+  update();
+
+});
+
+
+/* =========================
+   初期表示
+========================= */
+
+update();
+
+</script>
+
+
+</body>
+</html>
